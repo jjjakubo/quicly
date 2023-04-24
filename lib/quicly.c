@@ -21,12 +21,10 @@
  */
 #include <assert.h>
 #include <inttypes.h>
-#include <netinet/in.h>
 #include <pthread.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/socket.h>
 #include <sys/time.h>
 #include "khash.h"
 #include "quicly.h"
@@ -421,7 +419,7 @@ struct st_quicly_conn_t {
 };
 
 #if QUICLY_USE_TRACER
-#include "quicly-tracer.h"
+//#include "quicly-tracer.h"
 #endif
 
 struct st_quicly_handle_payload_state_t {

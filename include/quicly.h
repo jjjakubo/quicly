@@ -26,11 +26,16 @@
 extern "C" {
 #endif
 
+#ifdef WIN32
+#include "quicly/wincompat.h"
+#else
 #include <netinet/in.h>
+#include <sys/socket.h>
+#endif
+
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include <sys/socket.h>
 #include <sys/types.h>
 #include "picotls.h"
 #include "quicly/constants.h"
