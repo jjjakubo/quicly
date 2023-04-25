@@ -30,7 +30,7 @@ IF(NOT CMAKE_BUILD_TYPE)
     SET(CMAKE_BUILD_TYPE Release)
 ENDIF(NOT CMAKE_BUILD_TYPE)
 
-INCLUDE_DIRECTORIES(
+SET( QUICLY_INCLUDES
     ${OPENSSL_INCLUDE_DIR}
     deps/klib
     deps/picotls/include
@@ -60,8 +60,14 @@ SET(QUICLY_LIBRARY_FILES
     lib/retire_cid.c
     lib/sendstate.c
     lib/sentmap.c
-    lib/streambuf.c
-    include/quicly/wincompat.h)
+    lib/streambuf.c)
 
 ADD_LIBRARY(quicly ${QUICLY_LIBRARY_FILES})
 TARGET_LINK_LIBRARIES(quicly LINK_PUBLIC m)
+TARGET_INCLUDE_DIRECTORIES(quicly PUBLIC ${QUICLY_INCLUDES})
+
+set_target_properties(quicly PROPERTIES PUBLIC_HEADER "include/quicly.h")
+
+INSTALL( TARGETS quicly
+        LIBRARY DESTINATION lib
+        PUBLIC_HEADER DESTINATION include )

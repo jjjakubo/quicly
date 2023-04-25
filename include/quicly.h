@@ -27,7 +27,24 @@ extern "C" {
 #endif
 
 #ifdef WIN32
-#include "quicly/wincompat.h"
+
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <winsock2.h>
+#include <ws2ipdef.h>
+#include <ws2tcpip.h>
+
+#include <inttypes.h>
+#include <unistd.h>
+
+typedef uint16_t in_port_t;
+
+struct iovec
+{
+    void	*iov_base;  /* Base address of a memory region for input or output */
+    size_t	 iov_len;   /* The size of the memory pointed to by iov_base */
+};
+
 #else
 #include <netinet/in.h>
 #include <sys/socket.h>
