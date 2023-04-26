@@ -66,8 +66,10 @@ ADD_LIBRARY(quicly ${QUICLY_LIBRARY_FILES})
 TARGET_LINK_LIBRARIES(quicly LINK_PUBLIC m)
 TARGET_INCLUDE_DIRECTORIES(quicly PUBLIC ${QUICLY_INCLUDES})
 
-set_target_properties(quicly PROPERTIES PUBLIC_HEADER "include/quicly.h")
+set_target_properties(quicly PROPERTIES PUBLIC_HEADER "include/quicly.h;deps/picotls/include/picotls.h")
 
 INSTALL( TARGETS quicly
         LIBRARY DESTINATION lib
         PUBLIC_HEADER DESTINATION include )
+
+INSTALL( DIRECTORY include DESTINATION ${CMAKE_INSTALL_PREFIX}/ )
