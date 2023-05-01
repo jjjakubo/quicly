@@ -26,19 +26,22 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <getopt.h>
-#include <netdb.h>
 #include <stdio.h>
+#ifndef _WINDOWS
+#include <netdb.h>
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#endif
 #include <sys/types.h>
 #include <unistd.h>
 #include <openssl/pem.h>
-#include "picotls.h"
-#include "picotls/openssl.h"
+#include <openssl/applink.c>
 #include "quicly.h"
 #include "quicly/defaults.h"
 #include "quicly/streambuf.h"
+#include "picotls.h"
+#include "picotls/openssl.h"
 
 /**
  * the QUIC context
@@ -48,6 +51,10 @@ static quicly_context_t ctx;
  * CID seed
  */
 static quicly_cid_plaintext_t next_cid;
+
+struct msghdr {
+
+};
 
 static int resolve_address(struct sockaddr *sa, socklen_t *salen, const char *host, const char *port, int family, int type,
                            int proto)
@@ -85,6 +92,7 @@ static void usage(const char *progname)
            "When both `-c` and `-k` is specified, runs as a server.  Otherwise, runs as a\n"
            "client connecting to host:port.  If omitted, host defaults to 127.0.0.1.\n",
            progname);
+    WSACleanup();
     exit(0);
 }
 
@@ -159,35 +167,35 @@ static void on_receive(quicly_stream_t *stream, size_t off, const void *src, siz
 
 static void process_msg(int is_client, quicly_conn_t **conns, struct msghdr *msg, size_t dgram_len)
 {
-    size_t off = 0, i;
-
-    /* split UDP datagram into multiple QUIC packets */
-    while (off < dgram_len) {
-        quicly_decoded_packet_t decoded;
-        if (quicly_decode_packet(&ctx, &decoded, msg->msg_iov[0].iov_base, dgram_len, &off) == SIZE_MAX)
-            return;
-        /* find the corresponding connection (TODO handle version negotiation, rebinding, retry, etc.) */
-        for (i = 0; conns[i] != NULL; ++i)
-            if (quicly_is_destination(conns[i], NULL, msg->msg_name, &decoded))
-                break;
-        if (conns[i] != NULL) {
-            /* let the current connection handle ingress packets */
-            quicly_receive(conns[i], NULL, msg->msg_name, &decoded);
-        } else if (!is_client) {
-            /* assume that the packet is a new connection */
-            quicly_accept(conns + i, &ctx, NULL, msg->msg_name, &decoded, NULL, &next_cid, NULL, NULL);
-        }
-    }
+//    size_t off = 0, i;
+//
+//    /* split UDP datagram into multiple QUIC packets */
+//    while (off < dgram_len) {
+//        quicly_decoded_packet_t decoded;
+//        if (quicly_decode_packet(&ctx, &decoded, msg->msg_iov[0].iov_base, dgram_len, &off) == SIZE_MAX)
+//            return;
+//        /* find the corresponding connection (TODO handle version negotiation, rebinding, retry, etc.) */
+//        for (i = 0; conns[i] != NULL; ++i)
+//            if (quicly_is_destination(conns[i], NULL, msg->msg_name, &decoded))
+//                break;
+//        if (conns[i] != NULL) {
+//            /* let the current connection handle ingress packets */
+//            quicly_receive(conns[i], NULL, msg->msg_name, &decoded);
+//        } else if (!is_client) {
+//            /* assume that the packet is a new connection */
+//            quicly_accept(conns + i, &ctx, NULL, msg->msg_name, &decoded, NULL, &next_cid, NULL, NULL);
+//        }
+//    }
 }
 
 static int send_one(int fd, struct sockaddr *dest, struct iovec *vec)
 {
-    struct msghdr mess = {.msg_name = dest, .msg_namelen = quicly_get_socklen(dest), .msg_iov = vec, .msg_iovlen = 1};
-    int ret;
-
-    while ((ret = (int)sendmsg(fd, &mess, 0)) == -1 && errno == EINTR)
-        ;
-    return ret;
+//    struct msghdr mess = {.msg_name = dest, .msg_namelen = quicly_get_socklen(dest), .msg_iov = vec, .msg_iovlen = 1};
+//    int ret;
+//
+//    while ((ret = (int)sendmsg(fd, &mess, 0)) == -1 && errno == EINTR)
+//        ;
+//    return ret;
 }
 
 static int run_loop(int fd, quicly_conn_t *client)
@@ -230,12 +238,12 @@ static int run_loop(int fd, quicly_conn_t *client)
             uint8_t buf[4096];
             struct sockaddr_storage sa;
             struct iovec vec = {.iov_base = buf, .iov_len = sizeof(buf)};
-            struct msghdr msg = {.msg_name = &sa, .msg_namelen = sizeof(sa), .msg_iov = &vec, .msg_iovlen = 1};
-            ssize_t rret;
-            while ((rret = recvmsg(fd, &msg, 0)) == -1 && errno == EINTR)
-                ;
-            if (rret > 0)
-                process_msg(client != NULL, conns, &msg, rret);
+//            struct msghdr msg = {.msg_name = &sa, .msg_namelen = sizeof(sa), .msg_iov = &vec, .msg_iovlen = 1};
+//            ssize_t rret;
+//            while ((rret = recvmsg(fd, &msg, 0)) == -1 && errno == EINTR)
+//                ;
+//            if (rret > 0)
+                process_msg(client != NULL, conns, NULL, 0 /*&msg, rret*/);
         }
 
         /* read stdin, send the input to the active stram */
@@ -292,6 +300,16 @@ static int on_stream_open(quicly_stream_open_t *self, quicly_stream_t *stream)
 
 int main(int argc, char **argv)
 {
+#ifdef _WINDOWS
+    WSADATA wsaData;
+    WORD wVersionRequested = MAKEWORD(2, 2);
+    int err = WSAStartup(wVersionRequested, &wsaData);
+    if( err != 0 ) {
+        printf("WSAStartup failed with error: %d\n", err);
+        return 1;
+    }
+#endif
+
     ptls_openssl_sign_certificate_t sign_certificate;
     ptls_context_t tlsctx = {
         .random_bytes = ptls_openssl_random_bytes,
@@ -344,24 +362,28 @@ int main(int argc, char **argv)
             usage(argv[0]);
             break;
         default:
+            WSACleanup();
             exit(1);
-            break;
         }
     }
     if ((tlsctx.certificates.count != 0) != (tlsctx.sign_certificate != NULL)) {
         fprintf(stderr, "-c and -k options must be used together\n");
+        WSACleanup();
         exit(1);
     }
     argc -= optind;
     argv += optind;
     if (argc != 0)
         host = *argv++;
-    if (resolve_address((struct sockaddr *)&sa, &salen, host, port, AF_INET, SOCK_DGRAM, 0) != 0)
+    if (resolve_address((struct sockaddr *)&sa, &salen, host, port, AF_INET, SOCK_DGRAM, 0) != 0) {
+        WSACleanup();
         exit(1);
+    }
 
     /* open socket, on the specified port (as a server), or on any port (as a client) */
     if ((fd = socket(sa.ss_family, SOCK_DGRAM, 0)) == -1) {
         perror("socket(2) failed");
+        WSACleanup();
         exit(1);
     }
     // fcntl(fd, F_SETFL, O_NONBLOCK);
@@ -370,6 +392,7 @@ int main(int argc, char **argv)
         setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuseaddr, sizeof(reuseaddr));
         if (bind(fd, (struct sockaddr *)&sa, salen) != 0) {
             perror("bind(2) failed");
+            WSACleanup();
             exit(1);
         }
     } else {
@@ -377,6 +400,7 @@ int main(int argc, char **argv)
         memset(&local, 0, sizeof(local));
         if (bind(fd, (struct sockaddr *)&local, sizeof(local)) != 0) {
             perror("bind(2) failed");
+            WSACleanup();
             exit(1);
         }
     }
@@ -395,5 +419,9 @@ int main(int argc, char **argv)
     }
 
     /* enter the event loop with a connection object */
-    return run_loop(fd, client);
+    int ret = run_loop(fd, client);
+
+    WSACleanup();
+
+    return ret;
 }
