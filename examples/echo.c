@@ -52,9 +52,55 @@ static quicly_context_t ctx;
  */
 static quicly_cid_plaintext_t next_cid;
 
-struct msghdr {
+#ifdef _WINDOWS
+// socket-fwd.h
+#include <stdint.h>
 
+// Platform Specific Types
+#ifndef _WIN32
+typedef int socket_t;
+#else
+typedef uintptr_t socket_t;
+// These types are missing from WinSock
+typedef int socklen_t;
+typedef intptr_t ssize_t;
+#endif
+
+// Layout compatible with WSAMSG
+struct msghdr {
+    void         *msg_name;
+    socklen_t     msg_namelen;
+    struct iovec *msg_iov;
+    ULONG         msg_iovlen;
+    ULONG         msg_controllen;
+    void         *msg_control;
+    ULONG         msg_flags;
 };
+
+static ssize_t recvmsg(socket_t sock, struct msghdr *msg, DWORD flags) {
+    // NOTE: This does not implement the ancillary data feature
+    DWORD bytes = 0;
+    int result = WSARecvFrom(sock, (WSABUF*)msg->msg_iov, msg->msg_iovlen,
+                             &bytes, &flags, (struct sockaddr*)msg->msg_name,
+                             &msg->msg_namelen, NULL, NULL);
+    if (result == SOCKET_ERROR) return -1;
+    msg->msg_flags = flags;
+    msg->msg_controllen = 0;
+    printf("recv: %d\n", (int)bytes);
+    return (ssize_t)bytes;
+}
+
+static ssize_t sendmsg(socket_t sock, const struct msghdr *msg, DWORD flags) {
+    // NOTE: This does not implement the ancillary data feature
+    DWORD bytes = 0;
+    int result = WSASendTo(sock, (WSABUF*)msg->msg_iov, msg->msg_iovlen,
+                           &bytes, flags, (const struct sockaddr*)msg->msg_name,
+                           msg->msg_namelen, NULL, NULL);
+    if (result == SOCKET_ERROR) return -1;
+    printf("sent: %d\n", (int)bytes);
+    return (ssize_t)bytes;
+}
+#endif
 
 static int resolve_address(struct sockaddr *sa, socklen_t *salen, const char *host, const char *port, int family, int type,
                            int proto)
@@ -167,35 +213,35 @@ static void on_receive(quicly_stream_t *stream, size_t off, const void *src, siz
 
 static void process_msg(int is_client, quicly_conn_t **conns, struct msghdr *msg, size_t dgram_len)
 {
-//    size_t off = 0, i;
-//
-//    /* split UDP datagram into multiple QUIC packets */
-//    while (off < dgram_len) {
-//        quicly_decoded_packet_t decoded;
-//        if (quicly_decode_packet(&ctx, &decoded, msg->msg_iov[0].iov_base, dgram_len, &off) == SIZE_MAX)
-//            return;
-//        /* find the corresponding connection (TODO handle version negotiation, rebinding, retry, etc.) */
-//        for (i = 0; conns[i] != NULL; ++i)
-//            if (quicly_is_destination(conns[i], NULL, msg->msg_name, &decoded))
-//                break;
-//        if (conns[i] != NULL) {
-//            /* let the current connection handle ingress packets */
-//            quicly_receive(conns[i], NULL, msg->msg_name, &decoded);
-//        } else if (!is_client) {
-//            /* assume that the packet is a new connection */
-//            quicly_accept(conns + i, &ctx, NULL, msg->msg_name, &decoded, NULL, &next_cid, NULL, NULL);
-//        }
-//    }
+    size_t off = 0, i;
+
+    /* split UDP datagram into multiple QUIC packets */
+    while (off < dgram_len) {
+        quicly_decoded_packet_t decoded;
+        if (quicly_decode_packet(&ctx, &decoded, msg->msg_iov[0].iov_base, dgram_len, &off) == SIZE_MAX)
+            return;
+        /* find the corresponding connection (TODO handle version negotiation, rebinding, retry, etc.) */
+        for (i = 0; conns[i] != NULL; ++i)
+            if (quicly_is_destination(conns[i], NULL, msg->msg_name, &decoded))
+                break;
+        if (conns[i] != NULL) {
+            /* let the current connection handle ingress packets */
+            quicly_receive(conns[i], NULL, msg->msg_name, &decoded);
+        } else if (!is_client) {
+            /* assume that the packet is a new connection */
+            quicly_accept(conns + i, &ctx, NULL, msg->msg_name, &decoded, NULL, &next_cid, NULL, NULL);
+        }
+    }
 }
 
 static int send_one(int fd, struct sockaddr *dest, struct iovec *vec)
 {
-//    struct msghdr mess = {.msg_name = dest, .msg_namelen = quicly_get_socklen(dest), .msg_iov = vec, .msg_iovlen = 1};
-//    int ret;
-//
-//    while ((ret = (int)sendmsg(fd, &mess, 0)) == -1 && errno == EINTR)
-//        ;
-//    return ret;
+    struct msghdr mess = {.msg_name = dest, .msg_namelen = quicly_get_socklen(dest), .msg_iov = vec, .msg_iovlen = 1};
+    int ret;
+
+    while ((ret = (int)sendmsg(fd, &mess, 0)) == -1 && errno == EINTR)
+        ;
+    return ret;
 }
 
 static int run_loop(int fd, quicly_conn_t *client)
@@ -231,23 +277,26 @@ static int run_loop(int fd, quicly_conn_t *client)
             /* we want to read input from stdin */
             if (read_stdin)
                 FD_SET(0, &readfds);
+            printf("1\n");
         } while (select(fd + 1, &readfds, NULL, NULL, &tv) == -1 && errno == EINTR);
 
         /* read the QUIC fd */
         if (FD_ISSET(fd, &readfds)) {
+            printf("2\n");
             uint8_t buf[4096];
             struct sockaddr_storage sa;
             struct iovec vec = {.iov_base = buf, .iov_len = sizeof(buf)};
-//            struct msghdr msg = {.msg_name = &sa, .msg_namelen = sizeof(sa), .msg_iov = &vec, .msg_iovlen = 1};
-//            ssize_t rret;
-//            while ((rret = recvmsg(fd, &msg, 0)) == -1 && errno == EINTR)
-//                ;
-//            if (rret > 0)
-                process_msg(client != NULL, conns, NULL, 0 /*&msg, rret*/);
+            struct msghdr msg = {.msg_name = &sa, .msg_namelen = sizeof(sa), .msg_iov = &vec, .msg_iovlen = 1};
+            ssize_t rret;
+            while ((rret = recvmsg(fd, &msg, 0)) == -1 && errno == EINTR)
+                ;
+            if (rret > 0)
+                process_msg(client != NULL, conns, &msg, rret);
         }
 
         /* read stdin, send the input to the active stram */
         if (FD_ISSET(0, &readfds)) {
+            printf("3\n");
             assert(client != NULL);
             if (!forward_stdin(client))
                 read_stdin = 0;
@@ -255,6 +304,7 @@ static int run_loop(int fd, quicly_conn_t *client)
 
         /* send QUIC packets, if any */
         for (i = 0; conns[i] != NULL; ++i) {
+            printf("4\n");
             quicly_address_t dest, src;
             struct iovec dgrams[10];
             uint8_t dgrams_buf[PTLS_ELEMENTSOF(dgrams) * ctx.transport_params.max_udp_payload_size];
@@ -280,6 +330,9 @@ static int run_loop(int fd, quicly_conn_t *client)
                 return 1;
             }
         }
+
+        printf("5\n");
+
     }
 
     return 0;
@@ -291,6 +344,8 @@ static int on_stream_open(quicly_stream_open_t *self, quicly_stream_t *stream)
         quicly_streambuf_destroy, quicly_streambuf_egress_shift, quicly_streambuf_egress_emit, on_stop_sending, on_receive,
         on_receive_reset};
     int ret;
+
+    printf("stream opened: %lld\n", stream->stream_id);
 
     if ((ret = quicly_streambuf_create(stream, sizeof(quicly_streambuf_t))) != 0)
         return ret;
@@ -375,6 +430,7 @@ int main(int argc, char **argv)
     argv += optind;
     if (argc != 0)
         host = *argv++;
+    printf("host:%s port:%s\n", host, port);
     if (resolve_address((struct sockaddr *)&sa, &salen, host, port, AF_INET, SOCK_DGRAM, 0) != 0) {
         WSACleanup();
         exit(1);
@@ -390,17 +446,15 @@ int main(int argc, char **argv)
     if (is_server()) {
         int reuseaddr = 1;
         setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuseaddr, sizeof(reuseaddr));
-        if (bind(fd, (struct sockaddr *)&sa, salen) != 0) {
-            perror("bind(2) failed");
+        int result = bind(fd, (struct sockaddr *)&sa, salen);
+#ifdef _WINDOWS
+        if (result == SOCKET_ERROR) {
+            printf("bind() failed: %ld.\n", WSAGetLastError());
             WSACleanup();
-            exit(1);
-        }
-    } else {
-        struct sockaddr_in local;
-        memset(&local, 0, sizeof(local));
-        if (bind(fd, (struct sockaddr *)&local, sizeof(local)) != 0) {
+#else
+        if (result != 0) {
             perror("bind(2) failed");
-            WSACleanup();
+#endif
             exit(1);
         }
     }
@@ -410,7 +464,8 @@ int main(int argc, char **argv)
         /* initiate a connection, and open a stream */
         int ret;
         if ((ret = quicly_connect(&client, &ctx, host, (struct sockaddr *)&sa, NULL, &next_cid, ptls_iovec_init(NULL, 0), NULL,
-                                  NULL, NULL)) != 0) {
+                                  NULL, NULL)) != 0)
+        {
             fprintf(stderr, "quicly_connect failed:%d\n", ret);
             exit(1);
         }
