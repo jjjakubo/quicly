@@ -79,28 +79,50 @@ struct msghdr {
 
 static ssize_t recvmsg(socket_t sock, struct msghdr *msg, DWORD flags) {
     // NOTE: This does not implement the ancillary data feature
-    DWORD bytes = 0;
-    int result = WSARecvFrom(sock, (WSABUF*)msg->msg_iov, msg->msg_iovlen,
-                             &bytes, &flags, (struct sockaddr*)msg->msg_name,
-                             &msg->msg_namelen, NULL, NULL);
-    if (result == SOCKET_ERROR) return -1;
+    int result = recvfrom(sock, msg->msg_iov->iov_base, 4096, 0, (struct sockaddr*)&msg->msg_name, &msg->msg_namelen);
+    if (result == SOCKET_ERROR){
+        printf("WSARecvFrom() failed: %ld.\n", WSAGetLastError());
+        return -1;
+    }
     msg->msg_flags = flags;
     msg->msg_controllen = 0;
-    printf("recv: %d\n", (int)bytes);
-    return (ssize_t)bytes;
+    printf("recv: %d\n", result);
+    return (ssize_t)result;
 }
 
-static ssize_t sendmsg(socket_t sock, const struct msghdr *msg, DWORD flags) {
+static ssize_t sendmsg(socket_t sock, const struct msghdr *msg, DWORD flags, struct sockaddr *dest) {
     // NOTE: This does not implement the ancillary data feature
     DWORD bytes = 0;
-    int result = WSASendTo(sock, (WSABUF*)msg->msg_iov, msg->msg_iovlen,
-                           &bytes, flags, (const struct sockaddr*)msg->msg_name,
-                           msg->msg_namelen, NULL, NULL);
-    if (result == SOCKET_ERROR) return -1;
+    int result = sendto(sock, msg->msg_iov->iov_base, msg->msg_iov->iov_len, 0, dest, sizeof(struct sockaddr_in));
+    if (result == SOCKET_ERROR){
+        printf("WSASendTo() failed: %ld.\n", WSAGetLastError());
+        return -1;
+    }
     printf("sent: %d\n", (int)bytes);
     return (ssize_t)bytes;
 }
 #endif
+
+static char *get_ip_str(const struct sockaddr *sa, char *s, size_t maxlen)
+{
+    switch(sa->sa_family) {
+    case AF_INET:
+        inet_ntop(AF_INET, &(((struct sockaddr_in *)sa)->sin_addr),
+                  s, maxlen);
+        break;
+
+    case AF_INET6:
+        inet_ntop(AF_INET6, &(((struct sockaddr_in6 *)sa)->sin6_addr),
+                  s, maxlen);
+        break;
+
+    default:
+        strncpy(s, "Unknown AF", maxlen);
+        return NULL;
+    }
+
+    return s;
+}
 
 static int resolve_address(struct sockaddr *sa, socklen_t *salen, const char *host, const char *port, int family, int type,
                            int proto)
@@ -121,6 +143,10 @@ static int resolve_address(struct sockaddr *sa, socklen_t *salen, const char *ho
 
     memcpy(sa, res->ai_addr, res->ai_addrlen);
     *salen = res->ai_addrlen;
+
+    char buf[256] = "";
+    get_ip_str(sa, buf, 256);
+    printf("ip: %s\n", buf);
 
     freeaddrinfo(res);
     return 0;
@@ -239,7 +265,7 @@ static int send_one(int fd, struct sockaddr *dest, struct iovec *vec)
     struct msghdr mess = {.msg_name = dest, .msg_namelen = quicly_get_socklen(dest), .msg_iov = vec, .msg_iovlen = 1};
     int ret;
 
-    while ((ret = (int)sendmsg(fd, &mess, 0)) == -1 && errno == EINTR)
+    while ((ret = (int)sendmsg(fd, &mess, 0, dest)) == -1 && errno == EINTR)
         ;
     return ret;
 }
@@ -376,7 +402,7 @@ int main(int argc, char **argv)
     char *host = "127.0.0.1", *port = "4433";
     struct sockaddr_storage sa;
     socklen_t salen;
-    int ch, fd;
+    unsigned long ch, fd;
 
     /* setup quic context */
     ctx = quicly_spec_context;
@@ -438,25 +464,26 @@ int main(int argc, char **argv)
 
     /* open socket, on the specified port (as a server), or on any port (as a client) */
     if ((fd = socket(sa.ss_family, SOCK_DGRAM, 0)) == -1) {
-        perror("socket(2) failed");
+        printf("socket() failed: %ld.\n", WSAGetLastError());
         WSACleanup();
         exit(1);
     }
     // fcntl(fd, F_SETFL, O_NONBLOCK);
+    int result = 0;
     if (is_server()) {
         int reuseaddr = 1;
         setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuseaddr, sizeof(reuseaddr));
-        int result = bind(fd, (struct sockaddr *)&sa, salen);
+        result = bind(fd, (struct sockaddr *)&sa, salen);
+    }
 #ifdef _WINDOWS
-        if (result == SOCKET_ERROR) {
-            printf("bind() failed: %ld.\n", WSAGetLastError());
-            WSACleanup();
+    if (result == SOCKET_ERROR) {
+        printf("bind() failed: %ld.\n", WSAGetLastError());
+        WSACleanup();
 #else
-        if (result != 0) {
-            perror("bind(2) failed");
+    if (result != 0) {
+        perror("bind(2) failed");
 #endif
-            exit(1);
-        }
+        exit(1);
     }
 
     quicly_conn_t *client = NULL;
