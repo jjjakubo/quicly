@@ -79,11 +79,13 @@ struct msghdr {
 
 static ssize_t recvmsg(socket_t sock, struct msghdr *msg, DWORD flags) {
     // NOTE: This does not implement the ancillary data feature
+    printf("echo.c@%d\n", __LINE__ );
     int result = recvfrom(sock, msg->msg_iov->iov_base, 4096, 0, (struct sockaddr*)msg->msg_name, &msg->msg_namelen);
     if (result == SOCKET_ERROR){
         printf("WSARecvFrom() failed: %ld.\n", WSAGetLastError());
         return -1;
     }
+    printf("echo.c@%d\n", __LINE__ );
     msg->msg_flags = flags;
     msg->msg_controllen = 0;
     printf("recv: %d\n", result);
@@ -93,6 +95,7 @@ static ssize_t recvmsg(socket_t sock, struct msghdr *msg, DWORD flags) {
 static ssize_t sendmsg(socket_t sock, const struct msghdr *msg, DWORD flags, struct sockaddr *dest) {
     // NOTE: This does not implement the ancillary data feature
     DWORD bytes = 0;
+    printf("echo.c@%d\n", __LINE__ );
     int result = sendto(sock, msg->msg_iov->iov_base, msg->msg_iov->iov_len, 0, dest, sizeof(struct sockaddr_in));
     if (result == SOCKET_ERROR){
         printf("WSASendTo() failed: %ld.\n", WSAGetLastError());
@@ -105,6 +108,7 @@ static ssize_t sendmsg(socket_t sock, const struct msghdr *msg, DWORD flags, str
 
 static char *get_ip_str(const struct sockaddr *sa, char *s, size_t maxlen)
 {
+    printf("echo.c@%d\n", __LINE__ );
     switch(sa->sa_family) {
     case AF_INET:
         inet_ntop(AF_INET, &(((struct sockaddr_in *)sa)->sin_addr),
@@ -121,6 +125,7 @@ static char *get_ip_str(const struct sockaddr *sa, char *s, size_t maxlen)
         return NULL;
     }
 
+    printf("echo.c@%d\n", __LINE__ );
     return s;
 }
 
@@ -179,17 +184,21 @@ static int forward_stdin(quicly_conn_t *conn)
     char buf[4096];
     size_t rret;
 
+    printf("echo.c@%d\n", __LINE__ );
     if ((stream0 = quicly_get_stream(conn, 0)) == NULL || !quicly_sendstate_is_open(&stream0->sendstate))
         return 0;
 
+    printf("echo.c@%d\n", __LINE__ );
     while ((rret = read(0, buf, sizeof(buf))) == -1 && errno == EINTR)
         ;
     if (rret == 0) {
         /* stdin closed, close the send-side of stream0 */
+        printf("echo.c@%d\n", __LINE__ );
         quicly_streambuf_egress_shutdown(stream0);
         return 0;
     } else {
         /* write data to send buffer */
+        printf("echo.c@%d\n", __LINE__ );
         quicly_streambuf_egress_write(stream0, buf, rret);
         return 1;
     }
@@ -197,42 +206,54 @@ static int forward_stdin(quicly_conn_t *conn)
 
 static void on_stop_sending(quicly_stream_t *stream, int err)
 {
-    fprintf(stderr, "received STOP_SENDING: %" PRIu16 "\n", QUICLY_ERROR_GET_ERROR_CODE(err));
+    printf("received STOP_SENDING: %" PRIu16 "\n", QUICLY_ERROR_GET_ERROR_CODE(err));
     quicly_close(stream->conn, QUICLY_ERROR_FROM_APPLICATION_ERROR_CODE(0), "");
 }
 
 static void on_receive_reset(quicly_stream_t *stream, int err)
 {
-    fprintf(stderr, "received RESET_STREAM: %" PRIu16 "\n", QUICLY_ERROR_GET_ERROR_CODE(err));
+    printf("received RESET_STREAM: %" PRIu16 "\n", QUICLY_ERROR_GET_ERROR_CODE(err));
     quicly_close(stream->conn, QUICLY_ERROR_FROM_APPLICATION_ERROR_CODE(0), "");
 }
 
 static void on_receive(quicly_stream_t *stream, size_t off, const void *src, size_t len)
 {
     /* read input to receive buffer */
+    printf("echo.c@%d\n", __LINE__ );
     if (quicly_streambuf_ingress_receive(stream, off, src, len) != 0)
         return;
 
+    printf("echo.c@%d\n", __LINE__ );
     /* obtain contiguous bytes from the receive buffer */
     ptls_iovec_t input = quicly_streambuf_ingress_get(stream);
 
+    printf("echo.c@%d\n", __LINE__ );
     if (is_server()) {
         /* server: echo back to the client */
+        printf("echo.c@%d\n", __LINE__ );
         if (quicly_sendstate_is_open(&stream->sendstate) && (input.len > 0)) {
+            printf("echo.c@%d\n", __LINE__ );
             quicly_streambuf_egress_write(stream, input.base, input.len);
             /* shutdown the stream after echoing all data */
-            if (quicly_recvstate_transfer_complete(&stream->recvstate))
+            if (quicly_recvstate_transfer_complete(&stream->recvstate)) {
+                printf("echo.c@%d\n", __LINE__ );
                 quicly_streambuf_egress_shutdown(stream);
+            }
+            printf("echo.c@%d\n", __LINE__ );
         }
     } else {
         /* client: print to stdout */
+        printf("echo.c@%d\n", __LINE__ );
         fwrite(input.base, 1, input.len, stdout);
         fflush(stdout);
         /* initiate connection close after receiving all data */
-        if (quicly_recvstate_transfer_complete(&stream->recvstate))
+        if (quicly_recvstate_transfer_complete(&stream->recvstate)) {
+            printf("echo.c@%d\n", __LINE__ );
             quicly_close(stream->conn, 0, "");
+        }
     }
 
+    printf("echo.c@%d\n", __LINE__ );
     /* remove used bytes from receive buffer */
     quicly_streambuf_ingress_shift(stream, input.len);
 }
@@ -243,18 +264,22 @@ static void process_msg(int is_client, quicly_conn_t **conns, struct msghdr *msg
 
     /* split UDP datagram into multiple QUIC packets */
     while (off < dgram_len) {
+        printf("echo.c@%d\n", __LINE__ );
         quicly_decoded_packet_t decoded;
         if (quicly_decode_packet(&ctx, &decoded, msg->msg_iov[0].iov_base, dgram_len, &off) == SIZE_MAX)
             return;
+        printf("echo.c@%d\n", __LINE__ );
         /* find the corresponding connection (TODO handle version negotiation, rebinding, retry, etc.) */
         for (i = 0; conns[i] != NULL; ++i)
             if (quicly_is_destination(conns[i], NULL, msg->msg_name, &decoded))
                 break;
         if (conns[i] != NULL) {
             /* let the current connection handle ingress packets */
+            printf("echo.c@%d\n", __LINE__ );
             quicly_receive(conns[i], NULL, msg->msg_name, &decoded);
         } else if (!is_client) {
             /* assume that the packet is a new connection */
+            printf("echo.c@%d\n", __LINE__ );
             quicly_accept(conns + i, &ctx, NULL, msg->msg_name, &decoded, NULL, &next_cid, NULL, NULL);
         }
     }
@@ -265,8 +290,11 @@ static int send_one(int fd, struct sockaddr *dest, struct iovec *vec)
     struct msghdr mess = {.msg_name = dest, .msg_namelen = quicly_get_socklen(dest), .msg_iov = vec, .msg_iovlen = 1};
     int ret;
 
-    while ((ret = (int)sendmsg(fd, &mess, 0, dest)) == -1 && errno == EINTR)
-        ;
+    printf("echo.c@%d\n", __LINE__ );
+    while ((ret = (int)sendmsg(fd, &mess, 0, dest)) == -1 && errno == EINTR) {
+        printf("echo.c@%d\n", __LINE__ );
+    }
+    printf("echo.c@%d\n", __LINE__ );
     return ret;
 }
 
@@ -277,11 +305,13 @@ static int run_loop(int fd, quicly_conn_t *client)
     int read_stdin = client != NULL;
 
     while (1) {
+        printf("echo.c@%d\n", __LINE__ );
 
         /* wait for sockets to become readable, or some event in the QUIC stack to fire */
         fd_set readfds;
         struct timeval tv;
         do {
+            printf("echo.c@%d\n", __LINE__ );
             int64_t first_timeout = INT64_MAX, now = ctx.now->cb(ctx.now);
             for (i = 0; conns[i] != NULL; ++i) {
                 int64_t conn_timeout = quicly_get_first_timeout(conns[i]);
@@ -303,26 +333,27 @@ static int run_loop(int fd, quicly_conn_t *client)
             /* we want to read input from stdin */
             if (read_stdin)
                 FD_SET(0, &readfds);
-            printf("1\n");
+            printf("echo.c@%d\n", __LINE__ );
         } while (select(fd + 1, &readfds, NULL, NULL, &tv) == -1 && errno == EINTR);
 
         /* read the QUIC fd */
         if (FD_ISSET(fd, &readfds)) {
-            printf("2\n");
+            printf("echo.c@%d\n", __LINE__ );
             uint8_t buf[4096];
             struct sockaddr_storage sa;
             struct iovec vec = {.iov_base = buf, .iov_len = sizeof(buf)};
             struct msghdr msg = {.msg_name = &sa, .msg_namelen = sizeof(sa), .msg_iov = &vec, .msg_iovlen = 1};
             ssize_t rret;
-            while ((rret = recvmsg(fd, &msg, 0)) == -1 && errno == EINTR)
-                ;
+            while ((rret = recvmsg(fd, &msg, 0)) == -1 && errno == EINTR) {
+                printf("echo.c@%d\n", __LINE__ );
+            }
             if (rret > 0)
                 process_msg(client != NULL, conns, &msg, rret);
         }
 
         /* read stdin, send the input to the active stram */
         if (FD_ISSET(0, &readfds)) {
-            printf("3\n");
+            printf("echo.c@%d\n", __LINE__ );
             assert(client != NULL);
             if (!forward_stdin(client))
                 read_stdin = 0;
@@ -330,21 +361,24 @@ static int run_loop(int fd, quicly_conn_t *client)
 
         /* send QUIC packets, if any */
         for (i = 0; conns[i] != NULL; ++i) {
-            printf("4\n");
+            printf("echo.c@%d\n", __LINE__ );
             quicly_address_t dest, src;
             struct iovec dgrams[10];
             uint8_t dgrams_buf[PTLS_ELEMENTSOF(dgrams) * ctx.transport_params.max_udp_payload_size];
             size_t num_dgrams = PTLS_ELEMENTSOF(dgrams);
             int ret = quicly_send(conns[i], &dest, &src, dgrams, &num_dgrams, dgrams_buf, sizeof(dgrams_buf));
+            printf("echo.c@%d\n", __LINE__ );
             switch (ret) {
             case 0: {
                 size_t j;
                 for (j = 0; j != num_dgrams; ++j) {
                     send_one(fd, &dest.sa, &dgrams[j]);
+                    printf("echo.c@%d\n", __LINE__ );
                 }
             } break;
             case QUICLY_ERROR_FREE_CONNECTION:
                 /* connection has been closed, free, and exit when running as a client */
+                printf("echo.c@%d\n", __LINE__ );
                 quicly_free(conns[i]);
                 memmove(conns + i, conns + i + 1, sizeof(conns) - sizeof(conns[0]) * (i + 1));
                 --i;
@@ -352,22 +386,29 @@ static int run_loop(int fd, quicly_conn_t *client)
                     return 0;
                 break;
             default:
+                printf("echo.c@%d\n", __LINE__ );
                 fprintf(stderr, "quicly_send returned %d\n", ret);
                 return 1;
             }
         }
 
-        printf("5\n");
-
+        printf("echo.c@%d\n", __LINE__ );
     }
 
     return 0;
 }
 
+static void on_destroy(quicly_stream_t *stream, int err)
+{
+    printf( "stream %lld closed, err: %d\n", stream->stream_id, err );
+
+    quicly_streambuf_destroy(stream, err);
+}
+
 static int on_stream_open(quicly_stream_open_t *self, quicly_stream_t *stream)
 {
     static const quicly_stream_callbacks_t stream_callbacks = {
-        quicly_streambuf_destroy, quicly_streambuf_egress_shift, quicly_streambuf_egress_emit, on_stop_sending, on_receive,
+        on_destroy, quicly_streambuf_egress_shift, quicly_streambuf_egress_emit, on_stop_sending, on_receive,
         on_receive_reset};
     int ret;
 
@@ -375,6 +416,7 @@ static int on_stream_open(quicly_stream_open_t *self, quicly_stream_t *stream)
 
     if ((ret = quicly_streambuf_create(stream, sizeof(quicly_streambuf_t))) != 0)
         return ret;
+    printf("echo.c@%d\n", __LINE__ );
     stream->callbacks = &stream_callbacks;
     return 0;
 }
@@ -501,7 +543,9 @@ int main(int argc, char **argv)
     }
 
     /* enter the event loop with a connection object */
+    printf("echo.c@%d\n", __LINE__ );
     int ret = run_loop(fd, client);
+    printf("echo.c@%d\n", __LINE__ );
 
     WSACleanup();
 
