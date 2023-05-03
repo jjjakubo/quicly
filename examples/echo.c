@@ -79,7 +79,7 @@ struct msghdr {
 
 static ssize_t recvmsg(socket_t sock, struct msghdr *msg, DWORD flags) {
     // NOTE: This does not implement the ancillary data feature
-    int result = recvfrom(sock, msg->msg_iov->iov_base, 4096, 0, (struct sockaddr*)&msg->msg_name, &msg->msg_namelen);
+    int result = recvfrom(sock, msg->msg_iov->iov_base, 4096, 0, (struct sockaddr*)msg->msg_name, &msg->msg_namelen);
     if (result == SOCKET_ERROR){
         printf("WSARecvFrom() failed: %ld.\n", WSAGetLastError());
         return -1;
