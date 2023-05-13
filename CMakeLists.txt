@@ -65,7 +65,9 @@ SET(QUICLY_LIBRARY_FILES
     lib/retire_cid.c
     lib/sendstate.c
     lib/sentmap.c
-    lib/streambuf.c)
+    lib/streambuf.c
+    ${PICOTLS_OPENSSL_FILES}
+    )
 
 IF(WIN32)
     SET(CMAKE_C_FLAGS "-D_WINDOWS=1 ${CC_WARNING_FLAGS} ${CMAKE_C_FLAGS}")
@@ -73,11 +75,11 @@ ENDIF ()
 #SET(CMAKE_C_FLAGS_DEBUG "-O0")
 #SET(CMAKE_C_FLAGS_RELEASE "-O2")
 
-ADD_LIBRARY(picotls ${PICOTLS_OPENSSL_FILES} ${PICOTLS_WIN32COMPAT_FILES})
-TARGET_LINK_LIBRARIES(picotls LINK_PUBLIC m mswsock ws2_32)
-TARGET_INCLUDE_DIRECTORIES(picotls PUBLIC ${QUICLY_INCLUDES})
-
-set_target_properties(picotls PROPERTIES PUBLIC_HEADER "deps/picotls/include/picotls.h")
+#ADD_LIBRARY(picotls ${PICOTLS_OPENSSL_FILES} ${PICOTLS_WIN32COMPAT_FILES})
+#TARGET_LINK_LIBRARIES(picotls LINK_PUBLIC m mswsock ws2_32)
+#TARGET_INCLUDE_DIRECTORIES(picotls PUBLIC ${QUICLY_INCLUDES})
+#
+#set_target_properties(picotls PROPERTIES PUBLIC_HEADER "deps/picotls/include/picotls.h")
 
 ADD_LIBRARY(quicly ${QUICLY_LIBRARY_FILES})
 TARGET_LINK_LIBRARIES(quicly LINK_PUBLIC m mswsock ws2_32)
@@ -94,18 +96,18 @@ INSTALL( TARGETS quicly
 
 INSTALL( DIRECTORY include DESTINATION ${CMAKE_INSTALL_PREFIX}/ )
 
-INSTALL( TARGETS picotls
-        LIBRARY DESTINATION lib
-        PUBLIC_HEADER DESTINATION include )
-
-INSTALL( DIRECTORY deps/picotls/include DESTINATION ${CMAKE_INSTALL_PREFIX}/ )
+#INSTALL( TARGETS picotls
+#        LIBRARY DESTINATION lib
+#        PUBLIC_HEADER DESTINATION include )
+#
+#INSTALL( DIRECTORY deps/picotls/include DESTINATION ${CMAKE_INSTALL_PREFIX}/ )
 
 # ------------ #
 
 if( WITH_EXAMPLE )
     ADD_EXECUTABLE(examples-echo examples/echo.c)
     MESSAGE("Libs: ${OPENSSL_CRYPTO_LIBRARIES} ${CMAKE_DL_LIBS}")
-    TARGET_LINK_LIBRARIES(examples-echo LINK_PUBLIC quicly picotls mswsock ws2_32 ${OPENSSL_CRYPTO_LIBRARIES} ${CMAKE_DL_LIBS})
+    TARGET_LINK_LIBRARIES(examples-echo LINK_PUBLIC quicly mswsock ws2_32 ${OPENSSL_CRYPTO_LIBRARIES} ${CMAKE_DL_LIBS})
     IF(WIN32)
         TARGET_INCLUDE_DIRECTORIES(examples-echo PUBLIC include/ )
     ENDIF ()
