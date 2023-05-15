@@ -533,14 +533,16 @@ static void set_address(quicly_address_t *addr, struct sockaddr *sa)
 
 static ptls_cipher_suite_t *get_aes128gcmsha256(quicly_context_t *ctx)
 {
-    ptls_cipher_suite_t **cs;
+    ptls_cipher_suite_t **cs = ctx->tls->cipher_suites;
+    int i = 0;
 
-    for (cs = ctx->tls->cipher_suites;; ++cs) {
+    for (; ; i++) {
         assert(cs != NULL);
-        if ((*cs)->id == PTLS_CIPHER_SUITE_AES_128_GCM_SHA256)
+        if (cs[i]->id == PTLS_CIPHER_SUITE_AES_128_GCM_SHA256)
             break;
     }
-    return *cs;
+
+    return cs[i];
 }
 
 static inline uint8_t get_epoch(uint8_t first_byte)
