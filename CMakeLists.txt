@@ -1,4 +1,4 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 3.20)
+CMAKE_MINIMUM_REQUIRED(VERSION 2.8.12)
 CMAKE_POLICY(SET CMP0003 NEW)
 
 PROJECT(quicly)
@@ -9,8 +9,6 @@ INCLUDE(deps/picotls/cmake/boringssl-adjust.cmake)
 INCLUDE(deps/picotls/cmake/dtrace-utils.cmake)
 
 FIND_PACKAGE(OpenSSL REQUIRED)
-cmake_path(GET OPENSSL_INCLUDE_DIR PARENT_PATH OPENSSL_BASE_DIR)
-MESSAGE("Base: ${OPENSSL_BASE_DIR} ${OPENSSL_INCLUDE_DIR}")
 
 OPTION(WITH_EXAMPLE "whether or not to build the example binary" ON)
 
