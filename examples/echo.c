@@ -281,6 +281,7 @@ static void process_msg(int is_client, quicly_conn_t **conns, struct msghdr *msg
             /* assume that the packet is a new connection */
             printf("echo.c@%d\n", __LINE__ );
             quicly_accept(conns + i, &ctx, NULL, msg->msg_name, &decoded, NULL, &next_cid, NULL, NULL);
+            quicly_set_cc(conns[i], &quicly_cc_type_search);
         }
     }
 }
@@ -538,6 +539,8 @@ int main(int argc, char **argv)
             fprintf(stderr, "quicly_connect failed:%d\n", ret);
             exit(1);
         }
+        quicly_set_cc(client, &quicly_cc_type_search);
+
         quicly_stream_t *stream; /* we retain the opened stream via the on_stream_open callback */
         quicly_open_stream(client, &stream, 0);
     }

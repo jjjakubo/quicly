@@ -39,6 +39,13 @@ extern "C" {
 #define QUICLY_MIN_CWND 2
 #define QUICLY_RENO_BETA 0.7
 
+#define CCSEARCH_NUMBINS    (10)
+#define CCSEARCH_RTT_MIN    (40)
+
+#define CCSEARCH_WINDOWSIZE (CCSEARCH_RTT_MIN * 3.5)
+#define CCSEARCH_BINTIME    (CCSEARCH_WINDOWSIZE / CCSEARCH_NUMBINS)
+#define CCSEARCH_THRESH     (0.25)
+
 /**
  * Holds pointers to concrete congestion control implementation functions.
  */
@@ -112,6 +119,17 @@ typedef struct st_quicly_cc_t {
              */
             int64_t last_sent_time;
         } cubic;
+        /**
+         * State information for SEARCH congestion control
+         */
+         struct {
+             uint32_t sent[CCSEARCH_NUMBINS];
+             uint32_t delv[CCSEARCH_NUMBINS];
+
+             uint32_t bin_index;
+             int64_t bin_end;
+
+         } search;
     } state;
     /**
      * Initial congestion window.
@@ -172,11 +190,11 @@ struct st_quicly_cc_type_t {
 /**
  * The type objects for each CC. These can be used for testing the type of each `quicly_cc_t`.
  */
-extern quicly_cc_type_t quicly_cc_type_reno, quicly_cc_type_cubic, quicly_cc_type_pico;
+extern quicly_cc_type_t quicly_cc_type_reno, quicly_cc_type_cubic, quicly_cc_type_pico, quicly_cc_type_search;
 /**
  * The factory methods for each CC.
  */
-extern struct st_quicly_init_cc_t quicly_cc_reno_init, quicly_cc_cubic_init, quicly_cc_pico_init;
+extern struct st_quicly_init_cc_t quicly_cc_reno_init, quicly_cc_cubic_init, quicly_cc_pico_init, quicly_cc_search_init;
 
 /**
  * A null-terminated list of all CC types.

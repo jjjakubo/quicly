@@ -113,7 +113,9 @@ static int reno_on_switch(quicly_cc_t *cc)
 
 static void reno_init(quicly_init_cc_t *self, quicly_cc_t *cc, uint32_t initcwnd, int64_t now)
 {
+    printf("cc-reno.c@%d\n", __LINE__ );
     reno_reset(cc, initcwnd);
+    printf("cc-reno.c@%d\n", __LINE__ );
 }
 
 quicly_cc_type_t quicly_cc_type_reno = {"reno",
@@ -125,7 +127,9 @@ quicly_cc_type_t quicly_cc_type_reno = {"reno",
                                         reno_on_switch};
 quicly_init_cc_t quicly_cc_reno_init = {reno_init};
 
-quicly_cc_type_t *quicly_cc_all_types[] = {&quicly_cc_type_reno, &quicly_cc_type_cubic, &quicly_cc_type_pico, NULL};
+quicly_cc_type_t *quicly_cc_all_types[] = {&quicly_cc_type_reno, &quicly_cc_type_cubic, &quicly_cc_type_pico,
+                                           &quicly_cc_type_search,
+                                           NULL};
 
 uint32_t quicly_cc_calc_initial_cwnd(uint32_t max_packets, uint16_t max_udp_payload_size)
 {
