@@ -113,9 +113,9 @@ static int reno_on_switch(quicly_cc_t *cc)
 
 static void reno_init(quicly_init_cc_t *self, quicly_cc_t *cc, uint32_t initcwnd, int64_t now)
 {
-    printf("cc-reno.c@%d\n", __LINE__ );
+    printf("%s@%d\n", __FILE__, __LINE__ );
     reno_reset(cc, initcwnd);
-    printf("cc-reno.c@%d\n", __LINE__ );
+    printf("%s@%d\n", __FILE__, __LINE__ );
 }
 
 quicly_cc_type_t quicly_cc_type_reno = {"reno",

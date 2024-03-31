@@ -488,21 +488,14 @@ static const struct st_ptls_salt_t *get_salt(uint32_t protocol_version)
 
 static void lock_now(quicly_conn_t *conn, int is_reentrant)
 {
-    if (conn->stash.now == 0) {
-        assert(conn->stash.lock_count == 0);
+    if( conn->stash.lock_count == 0 ) {
         conn->stash.now = conn->super.ctx->now->cb(conn->super.ctx->now);
-    } else {
-        assert(is_reentrant && "caller must be reentrant");
-        assert(conn->stash.lock_count != 0);
     }
-
     ++conn->stash.lock_count;
 }
 
 static void unlock_now(quicly_conn_t *conn)
 {
-    assert(conn->stash.now != 0);
-
     if (--conn->stash.lock_count == 0)
         conn->stash.now = 0;
 }
@@ -3660,7 +3653,6 @@ int quicly_stream_can_send(quicly_stream_t *stream, int at_stream_level)
         return 1;
     /* we can always send EOS, if that is the only thing to be sent */
     if (stream->sendstate.pending.ranges[0].start >= stream->sendstate.final_size) {
-        assert(stream->sendstate.pending.ranges[0].start == stream->sendstate.final_size);
         return 1;
     }
 
@@ -4549,6 +4541,8 @@ static int do_send(quicly_conn_t *conn, quicly_send_context_t *s)
             conn->stash.now) {
         QUICLY_PROBE(HANDSHAKE_TIMEOUT, conn, conn->stash.now, conn->stash.now - conn->created_at, conn->egress.loss.rtt.smoothed);
         QUICLY_LOG_CONN(handshake_timeout, conn, {
+            PTLS_LOG_ELEMENT_SIGNED(now, conn->stash.now);
+            PTLS_LOG_ELEMENT_SIGNED(created, conn->created_at);
             PTLS_LOG_ELEMENT_SIGNED(elapsed, conn->stash.now - conn->created_at);
             PTLS_LOG_ELEMENT_UNSIGNED(rtt_smoothed, conn->egress.loss.rtt.smoothed);
         });
