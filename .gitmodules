@@ -4,3 +4,7 @@
 [submodule "deps/picotest"]
 	path = deps/picotest
 	url = https://github.com/kazuho/picotest.git
+[submodule "deps/picotls"]
+	path = deps/picotls
+	url = https://github.com/Project-Faster/picotls.git
+	branch = win_logging
