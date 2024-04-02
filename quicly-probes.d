@@ -126,6 +126,9 @@ provider quicly {
     probe stream_data_blocked_send(struct st_quicly_conn_t *conn, int64_t at, int64_t stream_id, uint64_t maximum);
     probe stream_data_blocked_receive(struct st_quicly_conn_t *conn, int64_t at, int64_t stream_id, uint64_t maximum);
 
+    probe ecn_validation(struct st_quicly_conn_t *conn, int64_t at, int ecn_state);
+    probe ecn_congestion(struct st_quicly_conn_t *conn, int64_t at, uint64_t ce_count);
+
     probe datagram_send(struct st_quicly_conn_t *conn, int64_t at, const void *payload, size_t payload_len);
     probe datagram_receive(struct st_quicly_conn_t *conn, int64_t at, const void *payload, size_t payload_len);
 
@@ -147,6 +150,9 @@ provider quicly {
     probe stream_on_receive(struct st_quicly_conn_t *conn, int64_t at, struct st_quicly_stream_t *stream, size_t off,
                             const void *src, size_t src_len);
     probe stream_on_receive_reset(struct st_quicly_conn_t *conn, int64_t at, struct st_quicly_stream_t *stream, int err);
+
+    probe enter_cc_limited(struct st_quicly_conn_t *conn, int64_t at, uint64_t pn);
+    probe exit_cc_limited(struct st_quicly_conn_t *conn, int64_t at, uint64_t pn);
 
     probe debug_message(struct st_quicly_conn_t *conn, const char *function, int line, const char *message);
 
