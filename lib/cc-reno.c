@@ -37,12 +37,9 @@ static void reno_on_acked(quicly_cc_t *cc, const quicly_loss_t *loss, uint32_t b
     quicly_cc_jumpstart_on_acked(cc, 0, bytes, largest_acked, inflight, next_pn);
 
     /* Slow start. */
-    if (cc->cwnd < cc->ssthresh) {
-        if (cc_limited) {
-            cc->cwnd += bytes;
-            if (cc->cwnd_maximum < cc->cwnd)
-                cc->cwnd_maximum = cc->cwnd;
-        }
+    if( cc->type->cc_slowstart_on_ack(cc, loss, bytes, largest_acked, inflight, cc_limited, next_pn,
+                                      now, max_udp_payload_size) == 1 )
+    {
         return;
     }
     /* Congestion avoidance. */
@@ -110,8 +107,9 @@ static void reno_reset(quicly_cc_t *cc, uint32_t initcwnd)
     quicly_cc_jumpstart_reset(cc);
 }
 
-static int reno_on_switch(quicly_cc_t *cc)
+static int reno_on_switch(quicly_cc_t *cc, quicly_cc_flags_t flags)
 {
+    cc->flags = flags;
     if (cc->type == &quicly_cc_type_reno) {
         return 1; /* nothing to do */
     } else if (cc->type == &quicly_cc_type_pico) {
@@ -133,9 +131,7 @@ static int reno_on_switch(quicly_cc_t *cc)
 
 static void reno_init(quicly_init_cc_t *self, quicly_cc_t *cc, uint32_t initcwnd, int64_t now)
 {
-    printf("%s@%d\n", __FILE__, __LINE__ );
     reno_reset(cc, initcwnd);
-    printf("%s@%d\n", __FILE__, __LINE__ );
 }
 
 quicly_cc_type_t quicly_cc_type_reno = {"reno",
@@ -145,12 +141,11 @@ quicly_cc_type_t quicly_cc_type_reno = {"reno",
                                         quicly_cc_reno_on_persistent_congestion,
                                         quicly_cc_reno_on_sent,
                                         reno_on_switch,
-                                        quicly_cc_jumpstart_enter};
+                                        quicly_cc_jumpstart_enter,
+                                        quicly_cc_slowstart_on_ack };
 quicly_init_cc_t quicly_cc_reno_init = {reno_init};
 
-quicly_cc_type_t *quicly_cc_all_types[] = {&quicly_cc_type_reno, &quicly_cc_type_cubic, &quicly_cc_type_pico,
-                                           &quicly_cc_type_search,
-                                           NULL};
+quicly_cc_type_t *quicly_cc_all_types[] = {&quicly_cc_type_reno, &quicly_cc_type_cubic, &quicly_cc_type_pico, NULL};
 
 uint32_t quicly_cc_calc_initial_cwnd(uint32_t max_packets, uint16_t max_udp_payload_size)
 {

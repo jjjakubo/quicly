@@ -74,12 +74,9 @@ static void cubic_on_acked(quicly_cc_t *cc, const quicly_loss_t *loss, uint32_t 
     quicly_cc_jumpstart_on_acked(cc, 0, bytes, largest_acked, inflight, next_pn);
 
     /* TODO: respect cc_limited */
-
-    /* Slow start. */
-    if (cc->cwnd < cc->ssthresh) {
-        cc->cwnd += bytes;
-        if (cc->cwnd_maximum < cc->cwnd)
-            cc->cwnd_maximum = cc->cwnd;
+    if( cc->type->cc_slowstart_on_ack(cc, loss, bytes, largest_acked, inflight, cc_limited, next_pn,
+                                      now, max_udp_payload_size) == 1 )
+    {
         return;
     }
 
@@ -183,8 +180,10 @@ static void cubic_reset(quicly_cc_t *cc, uint32_t initcwnd)
     quicly_cc_jumpstart_reset(cc);
 }
 
-static int cubic_on_switch(quicly_cc_t *cc)
+static int cubic_on_switch(quicly_cc_t *cc, quicly_cc_flags_t flags)
 {
+    cc->flags = flags;
+
     if (cc->type == &quicly_cc_type_cubic)
         return 1;
 
@@ -206,7 +205,12 @@ static void cubic_init(quicly_init_cc_t *self, quicly_cc_t *cc, uint32_t initcwn
     cubic_reset(cc, initcwnd);
 }
 
-quicly_cc_type_t quicly_cc_type_cubic = {"cubic",         &quicly_cc_cubic_init,          cubic_on_acked,
-                                         cubic_on_lost,   cubic_on_persistent_congestion, cubic_on_sent,
-                                         cubic_on_switch, quicly_cc_jumpstart_enter};
+quicly_cc_type_t quicly_cc_type_cubic = {"cubic",         &quicly_cc_cubic_init,
+                                         cubic_on_acked,
+                                         cubic_on_lost,
+                                         cubic_on_persistent_congestion,
+                                         cubic_on_sent,
+                                         cubic_on_switch,
+                                         quicly_cc_jumpstart_enter,
+                                         quicly_cc_slowstart_on_ack };
 quicly_init_cc_t quicly_cc_cubic_init = {cubic_init};

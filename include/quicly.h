@@ -45,6 +45,8 @@ struct iovec
     size_t	 iov_len;   /* The size of the memory pointed to by iov_base */
 };
 
+#define IPTOS_ECN_CE 0x03
+
 #else
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -1288,7 +1290,7 @@ void quicly_send_datagram_frames(quicly_conn_t *conn, ptls_iovec_t *datagrams, s
 /**
  * Sets CC to the specified type. Returns a boolean indicating if the operation was successful.
  */
-int quicly_set_cc(quicly_conn_t *conn, quicly_cc_type_t *cc);
+int quicly_set_cc(quicly_conn_t *conn, quicly_cc_type_t *cc, quicly_cc_flags_t flags);
 /**
  *
  */

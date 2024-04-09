@@ -52,11 +52,17 @@ extern "C" {
  */
 typedef const struct st_quicly_cc_type_t quicly_cc_type_t;
 
+typedef struct {
+    uint64_t use_slowstart_search;
+
+} quicly_cc_flags_t;
+
 typedef struct st_quicly_cc_t {
     /**
      * Congestion controller type.
      */
     quicly_cc_type_t *type;
+    quicly_cc_flags_t flags;
     /**
      * Current congestion window.
      */
@@ -125,15 +131,15 @@ typedef struct st_quicly_cc_t {
             int64_t last_sent_time;
         } cubic;
         /**
-         * State information for SEARCH congestion control
+         * State information for SEARCH slowstart control
          */
          struct {
              uint32_t sent[CCSEARCH_NUMBINS];
              uint32_t delv[CCSEARCH_NUMBINS];
 
+             uint32_t init;
              uint32_t bin_index;
              int64_t bin_end;
-
          } search;
     } state;
     /**
@@ -219,11 +225,16 @@ struct st_quicly_cc_type_t {
     /**
      * Switches the underlying algorithm of `cc` to that of `cc_switch`, returning a boolean if the operation was successful.
      */
-    int (*cc_switch)(quicly_cc_t *cc);
+    int (*cc_switch)(quicly_cc_t *cc, quicly_cc_flags_t flags);
     /**
      *
      */
     void (*cc_jumpstart)(quicly_cc_t *cc, uint32_t cwnd, uint64_t next_pn);
+    /**
+     *
+     */
+    int (*cc_slowstart_on_ack)(quicly_cc_t *cc, const quicly_loss_t *loss, uint32_t bytes, uint64_t largest_acked, uint32_t inflight,
+                                int cc_limited, uint64_t next_pn, int64_t now, uint32_t max_udp_payload_size);
 };
 
 /**
@@ -340,6 +351,9 @@ inline void quicly_cc_jumpstart_on_first_loss(quicly_cc_t *cc, uint64_t lost_pn)
             cc->jumpstart.exit_pn = lost_pn;
     }
 }
+
+int quicly_cc_slowstart_on_ack(quicly_cc_t *cc, const quicly_loss_t *loss, uint32_t bytes, uint64_t largest_acked, uint32_t inflight,
+                               int cc_limited, uint64_t next_pn, int64_t now, uint32_t max_udp_payload_size);
 
 #ifdef __cplusplus
 }

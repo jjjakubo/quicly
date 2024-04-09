@@ -22,13 +22,17 @@
 #include <assert.h>
 #include <inttypes.h>
 #include <sys/types.h>
+
+#ifndef WIN32
 #include <netinet/in.h>
 #include <netinet/ip.h>
+#include <sys/socket.h>
+#endif
+
 #include <pthread.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/socket.h>
 #include <sys/time.h>
 #include "khash.h"
 #include "quicly.h"
@@ -5080,9 +5084,10 @@ void quicly_send_datagram_frames(quicly_conn_t *conn, ptls_iovec_t *datagrams, s
     }
 }
 
-int quicly_set_cc(quicly_conn_t *conn, quicly_cc_type_t *cc)
+int quicly_set_cc(quicly_conn_t *conn, quicly_cc_type_t *cc, quicly_cc_flags_t flags)
 {
-    return cc->cc_switch(&conn->egress.cc);
+    assert(cc != NULL);
+    return cc->cc_switch(&conn->egress.cc, flags);
 }
 
 int quicly_send(quicly_conn_t *conn, quicly_address_t *dest, quicly_address_t *src, struct iovec *datagrams, size_t *num_datagrams,

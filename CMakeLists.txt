@@ -45,7 +45,7 @@ SET(QUICLY_LIBRARY_FILES
     lib/cc-reno.c
     lib/cc-cubic.c
     lib/cc-pico.c
-    lib/cc-search.c
+    lib/cc-slowstart.c
     lib/defaults.c
     lib/local_cid.c
     lib/loss.c
