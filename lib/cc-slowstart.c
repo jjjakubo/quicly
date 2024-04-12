@@ -91,6 +91,7 @@ static int search_slowstart_on_acked(quicly_cc_t *cc, const quicly_loss_t *loss,
     }
 
     cc->state.search.delv[index] += bytes;
+    cc->cwnd += bytes;
 
     float threshold = search_calc_threshold(cc); // calc current threshold
     if( threshold > CCSEARCH_THRESH )

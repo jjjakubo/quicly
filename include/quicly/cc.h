@@ -38,6 +38,7 @@ extern "C" {
 #include "quicly/loss.h"
 
 #define QUICLY_MIN_CWND 2
+#define QUICLY_MIN_MTU  1200
 #define QUICLY_RENO_BETA 0.7
 
 #define CCSEARCH_NUMBINS    (10)
