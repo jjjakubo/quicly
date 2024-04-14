@@ -149,13 +149,11 @@ quicly_cc_type_t *quicly_cc_all_types[] = {&quicly_cc_type_reno, &quicly_cc_type
 
 uint32_t quicly_cc_calc_initial_cwnd(uint32_t max_packets, uint16_t max_udp_payload_size)
 {
-    static const uint32_t mtu_max = 1472;
-
     /* apply filters to the two arguments */
     if (max_packets < QUICLY_MIN_CWND)
         max_packets = QUICLY_MIN_CWND;
-    if (max_udp_payload_size > mtu_max)
-        max_udp_payload_size = mtu_max;
+    if (max_udp_payload_size > QUICLY_MAX_MTU)
+        max_udp_payload_size = QUICLY_MAX_MTU;
     if (max_udp_payload_size < QUICLY_MIN_MTU)
         max_udp_payload_size = QUICLY_MIN_MTU;
 
