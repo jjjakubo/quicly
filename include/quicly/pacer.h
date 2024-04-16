@@ -25,6 +25,7 @@
 #include <assert.h>
 #include <stddef.h>
 #include <inttypes.h>
+#include "quicly/constants.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -80,6 +81,8 @@ inline void quicly_pacer_reset(quicly_pacer_t *pacer)
 
 inline int64_t quicly_pacer_can_send_at(quicly_pacer_t *pacer, uint32_t bytes_per_msec, uint16_t mtu)
 {
+    bytes_per_msec = (bytes_per_msec < QUICLY_MIN_MTU) ? QUICLY_MIN_MTU : bytes_per_msec;
+
     /* return "now" if we have room in current msec */
     size_t burst_size = QUICLY_PACER_BURST_LOW * mtu + 1;
     size_t burst_credit = burst_size > bytes_per_msec ? burst_size - bytes_per_msec : 0;

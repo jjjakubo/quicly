@@ -50,6 +50,8 @@ extern "C" {
 #define QUICLY_DEFAULT_MIN_PTO 1      /* milliseconds */
 #define QUICLY_DEFAULT_INITIAL_RTT 66 /* initial retransmission timeout is *3, i.e. 200ms */
 #define QUICLY_LOSS_DEFAULT_PACKET_THRESHOLD 3
+#define QUICLY_MIN_MTU  1200
+#define QUICLY_MAX_MTU  4096
 
 #define QUICLY_DEFAULT_PACKET_TOLERANCE 2
 #define QUICLY_MAX_PACKET_TOLERANCE 10
