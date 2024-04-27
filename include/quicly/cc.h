@@ -40,12 +40,13 @@ extern "C" {
 #define QUICLY_MIN_CWND 2
 #define QUICLY_RENO_BETA 0.7
 
-#define CCSEARCH_NUMBINS    (10)
-#define CCSEARCH_RTT_MIN    (40)
+#define CCSEARCH_NUMBINS    (13)
+#define CCSEARCH_NUMBINS_WINDOW    (CCSEARCH_NUMBINS-3)
+#define CCSEARCH_RTT_MIN    (400)
 
 #define CCSEARCH_WINDOWSIZE (CCSEARCH_RTT_MIN * 3.5)
-#define CCSEARCH_BINTIME    (CCSEARCH_WINDOWSIZE / CCSEARCH_NUMBINS)
-#define CCSEARCH_THRESH     (0.25)
+#define CCSEARCH_BINTIME    (CCSEARCH_WINDOWSIZE / CCSEARCH_NUMBINS_WINDOW)
+#define CCSEARCH_THRESH     (0.35)
 
 /**
  * Holds pointers to concrete congestion control implementation functions.
