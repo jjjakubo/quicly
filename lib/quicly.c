@@ -4904,6 +4904,14 @@ static int do_send(quicly_conn_t *conn, quicly_send_context_t *s)
         }
         s->send_window = calc_send_window(conn, min_packets_to_send * conn->egress.max_udp_payload_size,
                                           calc_amplification_limit_allowance(conn), pacer_window, restrict_sending);
+
+        QUICLY_LOG_CONN(send_window, conn, {
+          PTLS_LOG_ELEMENT_SIGNED(window, s->send_window);
+          PTLS_LOG_ELEMENT_UNSIGNED(min_cwnd, conn->egress.cc.cwnd);
+          PTLS_LOG_ELEMENT_UNSIGNED(cwnd, conn->egress.cc.cwnd);
+          PTLS_LOG_ELEMENT_UNSIGNED(max_cwnd, conn->egress.cc.cwnd);
+          PTLS_LOG_ELEMENT_SIGNED(inflight, conn->egress.loss.sentmap.bytes_in_flight);
+        });
     }
 
     orig_bytes_inflight = conn->egress.loss.sentmap.bytes_in_flight;
