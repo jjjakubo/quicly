@@ -74,12 +74,6 @@ static void pico_on_acked(quicly_cc_t *cc, const quicly_loss_t *loss, uint32_t b
 
     quicly_cc_jumpstart_on_acked(cc, 0, bytes, largest_acked, inflight, next_pn);
 
-    if( cc->type->cc_slowstart_on_ack(cc, loss, bytes, largest_acked, inflight, cc_limited, next_pn,
-                                      now, max_udp_payload_size) == 1 )
-    {
-        return;
-    }
-
     if (!cc_limited)
         return;
 
@@ -159,7 +153,6 @@ static void pico_reset(quicly_cc_t *cc, uint32_t initcwnd)
 {
     *cc = (quicly_cc_t){
         .type = &quicly_cc_type_pico,
-        .flags = cc->flags,
         .cwnd = initcwnd,
         .cwnd_initial = initcwnd,
         .cwnd_maximum = initcwnd,
@@ -172,9 +165,8 @@ static void pico_reset(quicly_cc_t *cc, uint32_t initcwnd)
     quicly_cc_jumpstart_reset(cc);
 }
 
-static int pico_on_switch(quicly_cc_t *cc, quicly_cc_flags_t flags)
+static int pico_on_switch(quicly_cc_t *cc)
 {
-    cc->flags = flags;
     if (cc->type == &quicly_cc_type_pico) {
         return 1; /* nothing to do */
     } else if (cc->type == &quicly_cc_type_reno) {
@@ -202,7 +194,6 @@ static void pico_init(quicly_init_cc_t *self, quicly_cc_t *cc, uint32_t initcwnd
 
 quicly_cc_type_t quicly_cc_type_pico = {"pico",         &quicly_cc_pico_init,          pico_on_acked,
                                         pico_on_lost,   pico_on_persistent_congestion, pico_on_sent,
-                                        pico_on_switch,
-                                        quicly_cc_jumpstart_enter,
-                                        quicly_cc_slowstart_on_ack };
+                                        pico_on_switch, &quicly_ss_type_disabled,
+                                        quicly_cc_jumpstart_enter};
 quicly_init_cc_t quicly_cc_pico_init = {pico_init};

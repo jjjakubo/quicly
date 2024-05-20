@@ -45,7 +45,6 @@ SET(QUICLY_LIBRARY_FILES
     lib/cc-reno.c
     lib/cc-cubic.c
     lib/cc-pico.c
-    lib/cc-slowstart.c
     lib/defaults.c
     lib/local_cid.c
     lib/loss.c
@@ -56,6 +55,8 @@ SET(QUICLY_LIBRARY_FILES
     lib/remote_cid.c
     lib/retire_cid.c
     lib/sendstate.c
+    lib/ss-rfc2001.c
+    lib/ss-search.c
     lib/sentmap.c
     lib/streambuf.c
     ${PICOTLS_OPENSSL_FILES}

@@ -40,30 +40,21 @@ extern "C" {
 #define QUICLY_MIN_CWND 2
 #define QUICLY_RENO_BETA 0.7
 
-#define CCSEARCH_NUMBINS    (13)
-#define CCSEARCH_NUMBINS_WINDOW    (CCSEARCH_NUMBINS-3)
-#define CCSEARCH_RTT_MIN    (400)
-
-#define CCSEARCH_WINDOWSIZE (CCSEARCH_RTT_MIN * 3.5)
-#define CCSEARCH_BINTIME    (CCSEARCH_WINDOWSIZE / CCSEARCH_NUMBINS_WINDOW)
-#define CCSEARCH_THRESH     (0.35)
+#define QUICLY_SEARCH_DELV_BIN_COUNT (10)               // number of search delivered bytes bins
+#define QUICLY_SEARCH_TOTAL_BIN_COUNT (25)              // number of search sent bytes bins
+#define QUICLY_SEARCH_WINDOW_MULTIPLIER (3.5)           // search multiplier for window calculation
+#define QUICLY_SEARCH_THRESH (0.35)                     // search threshold to exit slow start phase
 
 /**
  * Holds pointers to concrete congestion control implementation functions.
  */
 typedef const struct st_quicly_cc_type_t quicly_cc_type_t;
 
-typedef struct {
-    uint64_t use_slowstart_search;
-
-} quicly_cc_flags_t;
-
 typedef struct st_quicly_cc_t {
     /**
      * Congestion controller type.
      */
     quicly_cc_type_t *type;
-    quicly_cc_flags_t flags;
     /**
      * Current congestion window.
      */
@@ -72,6 +63,30 @@ typedef struct st_quicly_cc_t {
      * Current slow start threshold.
      */
     uint32_t ssthresh;
+    /**
+     * Slow-start specific data storage
+     */
+    union {
+        struct {
+            /**
+             * Bins for the byte count sent and the byte count delivered (instantiated on init)
+             */
+            uint64_t delv_bins[QUICLY_SEARCH_TOTAL_BIN_COUNT];
+            /**
+             * Maintains the end time of the current bin
+             */
+            int64_t bin_end;
+            /**
+             * Holds the size of each bin (based on the handshake RTT)
+             */
+            uint32_t bin_time;
+            /**
+             * Counts the number of times that the bin has been incremented, so we know when to
+             * start trying to watch for congestion
+             */
+            uint32_t bin_rounds;
+        } search;
+    } ss_state;
     /**
      * Packet number indicating end of recovery period, if in recovery.
      */
@@ -131,17 +146,6 @@ typedef struct st_quicly_cc_t {
              */
             int64_t last_sent_time;
         } cubic;
-        /**
-         * State information for SEARCH slowstart control
-         */
-         struct {
-             uint32_t sent[CCSEARCH_NUMBINS];
-             uint32_t delv[CCSEARCH_NUMBINS];
-
-             uint32_t init;
-             uint32_t bin_index;
-             int64_t bin_end;
-         } search;
     } state;
     /**
      * jumpstart state
@@ -226,26 +230,25 @@ struct st_quicly_cc_type_t {
     /**
      * Switches the underlying algorithm of `cc` to that of `cc_switch`, returning a boolean if the operation was successful.
      */
-    int (*cc_switch)(quicly_cc_t *cc, quicly_cc_flags_t flags);
+    int (*cc_switch)(quicly_cc_t *cc);
+    /*
+     * Defines a slowstart callback
+     */
+    struct st_quicly_ss_type_t *cc_slowstart;
     /**
      *
      */
     void (*cc_jumpstart)(quicly_cc_t *cc, uint32_t cwnd, uint64_t next_pn);
-    /**
-     *
-     */
-    int (*cc_slowstart_on_ack)(quicly_cc_t *cc, const quicly_loss_t *loss, uint32_t bytes, uint64_t largest_acked, uint32_t inflight,
-                                int cc_limited, uint64_t next_pn, int64_t now, uint32_t max_udp_payload_size);
 };
 
 /**
  * The type objects for each CC. These can be used for testing the type of each `quicly_cc_t`.
  */
-extern quicly_cc_type_t quicly_cc_type_reno, quicly_cc_type_cubic, quicly_cc_type_pico, quicly_cc_type_search;
+extern quicly_cc_type_t quicly_cc_type_reno, quicly_cc_type_cubic, quicly_cc_type_pico;
 /**
  * The factory methods for each CC.
  */
-extern struct st_quicly_init_cc_t quicly_cc_reno_init, quicly_cc_cubic_init, quicly_cc_pico_init, quicly_cc_search_init;
+extern struct st_quicly_init_cc_t quicly_cc_reno_init, quicly_cc_cubic_init, quicly_cc_pico_init;
 
 /**
  * A null-terminated list of all CC types.
@@ -352,9 +355,6 @@ inline void quicly_cc_jumpstart_on_first_loss(quicly_cc_t *cc, uint64_t lost_pn)
             cc->jumpstart.exit_pn = lost_pn;
     }
 }
-
-int quicly_cc_slowstart_on_ack(quicly_cc_t *cc, const quicly_loss_t *loss, uint32_t bytes, uint64_t largest_acked, uint32_t inflight,
-                               int cc_limited, uint64_t next_pn, int64_t now, uint32_t max_udp_payload_size);
 
 #ifdef __cplusplus
 }

@@ -20,6 +20,7 @@
  * IN THE SOFTWARE.
  */
 #include "quicly/cc.h"
+#include "quicly/defaults.h"
 #include "quicly.h"
 
 /* TODO: Avoid increase if sender was application limited. */
@@ -37,10 +38,11 @@ static void reno_on_acked(quicly_cc_t *cc, const quicly_loss_t *loss, uint32_t b
     quicly_cc_jumpstart_on_acked(cc, 0, bytes, largest_acked, inflight, next_pn);
 
     /* Slow start. */
-    if( cc->type->cc_slowstart_on_ack(cc, loss, bytes, largest_acked, inflight, cc_limited, next_pn,
-                                      now, max_udp_payload_size) == 1 )
-    {
-        return;
+    if (cc->cwnd < cc->ssthresh) {
+      if (cc_limited) {
+        cc->type->cc_slowstart->ss(cc, loss, bytes, largest_acked, inflight, next_pn, now, max_udp_payload_size);
+      }
+      return;
     }
     /* Congestion avoidance. */
     if (!cc_limited)
@@ -107,9 +109,8 @@ static void reno_reset(quicly_cc_t *cc, uint32_t initcwnd)
     quicly_cc_jumpstart_reset(cc);
 }
 
-static int reno_on_switch(quicly_cc_t *cc, quicly_cc_flags_t flags)
+static int reno_on_switch(quicly_cc_t *cc)
 {
-    cc->flags = flags;
     if (cc->type == &quicly_cc_type_reno) {
         return 1; /* nothing to do */
     } else if (cc->type == &quicly_cc_type_pico) {
@@ -141,21 +142,21 @@ quicly_cc_type_t quicly_cc_type_reno = {"reno",
                                         quicly_cc_reno_on_persistent_congestion,
                                         quicly_cc_reno_on_sent,
                                         reno_on_switch,
-                                        quicly_cc_jumpstart_enter,
-                                        quicly_cc_slowstart_on_ack };
+                                        &quicly_default_ss,
+                                        quicly_cc_jumpstart_enter};
 quicly_init_cc_t quicly_cc_reno_init = {reno_init};
 
 quicly_cc_type_t *quicly_cc_all_types[] = {&quicly_cc_type_reno, &quicly_cc_type_cubic, &quicly_cc_type_pico, NULL};
 
 uint32_t quicly_cc_calc_initial_cwnd(uint32_t max_packets, uint16_t max_udp_payload_size)
 {
+    static const uint32_t mtu_max = 1472;
+
     /* apply filters to the two arguments */
     if (max_packets < QUICLY_MIN_CWND)
         max_packets = QUICLY_MIN_CWND;
-    if (max_udp_payload_size > QUICLY_MAX_MTU)
-        max_udp_payload_size = QUICLY_MAX_MTU;
-    if (max_udp_payload_size < QUICLY_MIN_MTU)
-        max_udp_payload_size = QUICLY_MIN_MTU;
+    if (max_udp_payload_size > mtu_max)
+        max_udp_payload_size = mtu_max;
 
     uint64_t cwnd_bytes = (uint64_t)max_packets * max_udp_payload_size;
     return cwnd_bytes <= UINT32_MAX ? (uint32_t)cwnd_bytes : UINT32_MAX;
